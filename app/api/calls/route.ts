@@ -1,27 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// ✅ Access guard (billing enforcement)
-// NOTE: from app/api/calls/[id]/route.ts to src/lib/accessGuard is 4 levels up
-import { checkAccessByCustomerId } from "../../../../src/lib/accessGuard";
+import { checkAccessByCustomerId } from "../../../src/lib/accessGuard";
 
 export const runtime = "nodejs";
 
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest) {
   try {
     // ----------------------------
-    // ✅ Unwrap dynamic route params (Next.js App Router expects this)
-    // ----------------------------
-    const { id } = await context.params;
-
-    if (!id) {
-      return NextResponse.json({ error: "Missing call id" }, { status: 400 });
-    }
-
-    // ----------------------------
-    // ✅ Access Gate (Billing)
+    // Access Gate (Billing)
     // ----------------------------
     const customerId = req.headers.get("x-stripe-customer-id");
 
@@ -47,7 +32,7 @@ export async function GET(
     }
 
     // ----------------------------
-    // ✅ Calls detail lookup
+    // Calls List Logic
     // ----------------------------
     const baseUrl = process.env.AWS_CALLS_URL;
 
@@ -58,19 +43,8 @@ export async function GET(
       );
     }
 
-    // Try common REST patterns:
-    // 1) `${AWS_CALLS_URL}/${id}`
-    // 2) `${AWS_CALLS_URL}?id=${id}`
-    const url1 = `${baseUrl.replace(/\/$/, "")}/${encodeURIComponent(id)}`;
-    const url2 = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}id=${encodeURIComponent(id)}`;
-
-    // Attempt #1
-    let response = await fetch(url1, { method: "GET" });
-
-    // If upstream doesn't support /{id}, try ?id=
-    if (!response.ok) {
-      response = await fetch(url2, { method: "GET" });
-    }
+    // List endpoint (no id here)
+    const response = await fetch(baseUrl, { method: "GET" });
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
@@ -85,10 +59,12 @@ export async function GET(
     return NextResponse.json({
       ...data,
       access: { allowed: true, tier: decision.tier, status: decision.status },
-      requested: { id },
     });
   } catch (error) {
-    console.error("GET /api/calls/[id] failed:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("GET /api/calls failed:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
