@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     const payload: any = event.data.object;
     const invoiceId = payload.invoice;
     if (invoiceId) {
-      const invoice = await stripe.invoices.retrieve(invoiceId);
+      const invoice = (await stripe.invoices.retrieve(invoiceId)) as any;
       if (invoice.subscription) {
         billingData = await hydrateFromSubscription(
           String(invoice.subscription)
