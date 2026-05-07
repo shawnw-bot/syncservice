@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     console.log("Stripe key prefix:", secretKey.slice(0, 10));
 
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2026-03-25.dahlia",
     });
 
     const priceId = priceIdForTier(tier);
