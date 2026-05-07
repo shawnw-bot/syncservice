@@ -1,66 +1,91 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  ScanCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 export const runtime = "nodejs";
 
-const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "us-east-1",
-});
+// ✅ Lazy DynamoDB client (env-safe)
+let ddb: DynamoDBDocumentClient | null = null;
+let lastRegion: string | null = null;
 
-const doc = DynamoDBDocumentClient.from(client);
+function getDdb(region: string) {
+  if (!ddb || lastRegion !== region) {
+    const client = new DynamoDBClient({ region });
+    ddb = DynamoDBDocumentClient.from(client);
+    lastRegion = region;
+  }
+  return ddb;
+}
 
 export async function GET(
-  request: Request,
+  _request: NextRequest,
   context: { params: Promise<{ externalId: string }> }
 ) {
-  // ✅ FIX: properly await params
-  const { externalId } = await context.params;
-
+  const region = process.env.AWS_REGION;
   const tableName = process.env.DDB_TABLE_SYNC;
 
-  if (!tableName) {
+  if (!region) {
     return NextResponse.json(
-      { success: false, message: "Missing table" },
+      { success: false, message: "Missing AWS_REGION in environment" },
       { status: 500 }
     );
   }
 
+  if (!tableName) {
+    return NextResponse.json(
+      { success: false, message: "Missing DDB_TABLE_SYNC in environment" },
+      { status: 500 }
+    );
+  }
+
+  // ✅ Next.js expects params to be awaited
+  const { externalId } = await context.params;
+
+  if (!externalId) {
+    return NextResponse.json(
+      { success: false, message: "Missing externalId in route" },
+      { status: 400 }
+    );
+  }
+
+  const key = {
+    PK: "SYNC",
+    SK: `EXT#${externalId}`,
+  };
+
+  const doc = getDdb(region);
+
   try {
     const result = await doc.send(
-      new ScanCommand({
+      new GetCommand({
         TableName: tableName,
+        Key: key,
       })
     );
 
-    const items = result.Items ?? [];
-
-    const match = items.find(
-      (item: any) => item.external_id === externalId
-    );
-
-    if (!match) {
+    if (!result?.Item) {
       return NextResponse.json(
-        { success: false, message: "Not found" },
+        { success: false, message: "Sync record not found", external_id: externalId },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      item: match,
+      message: "Sync record fetched",
+      item: result.Item,
     });
   } catch (error: any) {
+    console.error("SYNC GET FAILED:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Error fetching record",
-        error: error?.message,
+        message: "Sync fetch failed",
+        errorName: error?.name ?? "UnknownError",
+        errorMessage: error?.message ?? String(error),
       },
       { status: 500 }
     );
   }
 }
+``
