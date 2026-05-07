@@ -18,7 +18,7 @@ function mustEnv(name: string) {
 }
 
 const stripe = new Stripe(mustEnv("STRIPE_SECRET_KEY"), {
-  apiVersion: "2023-10-16",
+  apiVersion: "2026-03-25.dahlia",
 });
 
 const doc = DynamoDBDocumentClient.from(
