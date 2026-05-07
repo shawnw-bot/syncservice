@@ -80,7 +80,7 @@ export default function CallDrawer({
                 callerName={call.caller_name}
                 phoneNumber={call.phone_number}
                 direction={call.direction}
-                status={call.status}
+                status={call.status as any}
                 startedAt={call.timestamp}
                 durationSeconds={call.duration_seconds}
               />
