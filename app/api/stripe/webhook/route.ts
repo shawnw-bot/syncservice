@@ -34,9 +34,9 @@ function resolveTierFromPriceId(priceId: string | null): string {
 }
 
 async function hydrateFromSubscription(subId: string) {
-  const sub = (await stripe.subscriptions.retrieve(...)) as any;
-    expand: ["items.data.price"],
-  });
+  const sub = (await stripe.subscriptions.retrieve(subId, {
+  expand: ["items.data.price"],
+})) as any;
 
   return {
     stripe_customer_id: String(sub.customer),
